@@ -3,7 +3,7 @@ import os
 import threading
 
 class Connection:
-    """
+    r"""
     `host` 数据库地址
 
     `port` 数据库端口
@@ -77,14 +77,14 @@ class Connection:
             return False
 
     def delete(self,tableName='',condition=''):
-        """\
-        删除行\
-\
-        `tableName` 表名\
-\
-        `condition` SQL语句中WHERE部分 例如 "WHERE \`id\` = '1'"\
-\
-        返回 True 或者 False\
+        r"""
+        删除行
+
+        `tableName` 表名
+
+        `condition` SQL语句中WHERE部分 例如 "WHERE \`id\` = '1'"
+
+        返回 True 或者 False
         """
         if(self.__connect()):
             try:
@@ -103,7 +103,7 @@ class Connection:
             return False
 
     def update(self,tableName='',data={},condition=''):
-        """
+        r"""
         更新行
 
         `tableName` 表名
@@ -135,7 +135,7 @@ class Connection:
             return False
     
     def select(self,tableName='',columns=(),condition=''):
-        """
+        r"""
         读取行
 
         `tableName` 表名
@@ -301,9 +301,6 @@ class Model(dict):
             for i in range(len(self.key)-1):
                 conditionStr += " AND `{0}`='{1}'".format(self.key[i+1],self.pop(self.key[i+1]))
         self.conn.update(self.tableName,self,conditionStr)
-
-
-
 
 def main():
     connection = Connection(input("Host Name:"),int(input("Port Number:")),input("User Name:"),input("Password:"),input("Database Name:"))
