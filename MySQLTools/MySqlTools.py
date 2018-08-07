@@ -185,13 +185,18 @@ class Connection:
             return []
 
     def buildModel(self,filePath):
+        print('Building Start!')
+        print('Building file path...')
         if not os.path.exists(filePath):
             os.makedirs(filePath)
+        print('Checking connection...')
         if self.__connect():
+            print('Ececuting SQL command...')
             cur = self.cnt.cursor()
             cmd = "SELECT `table_name`,`COLUMN_NAME`,`DATA_TYPE`,`COLUMN_KEY`,`EXTRA` FROM `information_schema`.`columns` WHERE table_schema='{0}'".format(self.cnt._database)
             cur.execute(cmd)
             tabelModel = {}
+            print('Getting table info...')
             for row in cur:
                 if row[0] in tabelModel:
                     tabelModel[row[0]] += ((row[1],row[2],row[3],row[4]),)
@@ -199,7 +204,9 @@ class Connection:
                     tabelModel[row[0]] = ()
                     tabelModel[row[0]] += ((row[1],row[2],row[3],row[4]),)
             cur.close()
+            print('Building code...')
             for table in tabelModel.items():
+                print('Building %s model...'%table[0])
                 f=open('%s\\%s.py'%(filePath,table[0]), 'w')
                 f.write("from MySQLTools.MySqlTools import Model\nfrom MySQLTools.MySqlTools import Connection\nimport datetime\n")
                 pri = ''
@@ -246,6 +253,7 @@ class Connection:
                 f.write("\t\telse:\n")
                 f.write("\t\t\tsuper().__init__(content)\n")
                 f.close()
+            print('Build Successed!!')
 
 class Model(dict):
     tableName = ''
@@ -303,8 +311,11 @@ class Model(dict):
         self.conn.update(self.tableName,self,conditionStr)
 
 def main():
-    connection = Connection(input("Host Name:"),int(input("Port Number:")),input("User Name:"),input("Password:"),input("Database Name:"))
-    connection.buildModel(input("Path To Build Model:"))
+    try:
+        connection = Connection(input("Host Name:"),int(input("Port Number:")),input("User Name:"),input("Password:"),input("Database Name:"))
+        connection.buildModel(os.path.dirname(os.path.dirname(__file__))+'\\Model')
+    except Exception as e:
+        print(e)
 
 if __name__ == '__main__':
     main()
