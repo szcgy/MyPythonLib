@@ -198,11 +198,11 @@ class Connection:
             tabelModel = {}
             print('Getting table info...')
             for row in cur:
-                if row[0] in tabelModel:
-                    tabelModel[row[0]] += ((row[1],row[2],row[3],row[4]),)
-                else:
-                    tabelModel[row[0]] = ()
-                    tabelModel[row[0]] += ((row[1],row[2],row[3],row[4]),)
+                #if row[0] in tabelModel:
+                tabelModel[row[0]] += ((row[1],row[2],row[3],row[4]),)
+                #else:
+                    #tabelModel[row[0]] = ()
+                   # tabelModel[row[0]] += ((row[1],row[2],row[3],row[4]),)
             cur.close()
             print('Building code...')
             for table in tabelModel.items():
@@ -300,7 +300,7 @@ class Model(dict):
         if ai:
             if len(self.aicolumn)>0:
                 del self[self.aicolumn]
-        self.conn.insert(self.tableName,self)
+        return self.conn.insert(self.tableName,self)
     
     def update(self):
         conditionStr = "WHERE `{0}`='{1}'".format(self.key[0],self.pop(self.key[0]))
@@ -308,7 +308,7 @@ class Model(dict):
         if keyLen>1:
             for i in range(len(self.key)-1):
                 conditionStr += " AND `{0}`='{1}'".format(self.key[i+1],self.pop(self.key[i+1]))
-        self.conn.update(self.tableName,self,conditionStr)
+        return self.conn.update(self.tableName,self,conditionStr)
 
 def main():
     try:
