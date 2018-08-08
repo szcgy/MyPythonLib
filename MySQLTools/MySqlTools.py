@@ -98,6 +98,7 @@ class Connection:
                 return True
             except Exception as e:
                 print(e)
+                self.lock.release()
                 return False
         else:
             return False
@@ -130,6 +131,7 @@ class Connection:
                 return True
             except Exception as e:
                 print(e)
+                self.lock.release()
                 return False
         else:
             return False
@@ -179,8 +181,8 @@ class Connection:
                 return datalist
             except Exception as e:
                 print(e)
-                return []
                 self.lock.release()
+                return []
         else:
             return []
 
@@ -198,22 +200,24 @@ class Connection:
             tabelModel = {}
             print('Getting table info...')
             for row in cur:
-                #if row[0] in tabelModel:
-                tabelModel[row[0]] += ((row[1],row[2],row[3],row[4]),)
-                #else:
-                    #tabelModel[row[0]] = ()
-                   # tabelModel[row[0]] += ((row[1],row[2],row[3],row[4]),)
+                if row[0] in tabelModel:
+                    tabelModel[row[0]] += ((row[1],row[2],row[3],row[4]),)
+                else:
+                    tabelModel[row[0]] = ()
+                    tabelModel[row[0]] += ((row[1],row[2],row[3],row[4]),)
             cur.close()
             print('Building code...')
             for table in tabelModel.items():
                 print('Building %s model...'%table[0])
                 f=open('%s\\%s.py'%(filePath,table[0]), 'w')
-                f.write("from MySQLTools.MySqlTools import Model\nfrom MySQLTools.MySqlTools import Connection\nimport datetime\n")
+                f.write("import sys\nimport os\nsys.path.append(os.path.dirname(os.path.dirname(__file__)))\nfrom MySQLTools.MySqlTools import Model\nfrom MySQLTools.MySqlTools import Connection\nimport datetime\n\n")
                 pri = ''
                 ai = ''
                 defalt = ''
+                allcol = ''
                 for column in table[1]:
                     f.write("{0} = '{0}'\n".format(column[0]))
+                    allcol += '%s, ' % column[0]
                     if column[2] == 'PRI':
                         pri += '%s, ' % column[0]
                     if column[3] == 'auto_increment':
@@ -244,9 +248,10 @@ class Connection:
                         defalt += "%s : None, " % column[0]
                 defalt = defalt[0:-2]
                 pri = pri[0:-1]
-                f.write('class %s(Model):\n' % table[0])
+                allcol = allcol[0:-1]
+                f.write('\nclass %s(Model):\n\n' % table[0])
                 f.write('\tdef __new__(cls,connection,args = None):\n')
-                f.write("\t\treturn super().__new__(cls,connection,((%s),'%s','%s'))\n\n" % (pri,table[0],ai))
+                f.write("\t\treturn super().__new__(cls,connection,((%s),'%s','%s',(%s)))\n\n" % (pri,table[0],ai,allcol))
                 f.write("\tdef __init__(self,connection,content=None):\n")
                 f.write("\t\tif content is None:\n")
                 f.write("\t\t\tsuper().__init__({%s})\n" % defalt)
@@ -260,7 +265,8 @@ class Model(dict):
     key = ()
     aicolumn = ''
     conn = None
-    
+    columns = ()
+
     def __init__(self,content):
         for each in content.items():
             self[each[0]] = each[1]
@@ -270,11 +276,12 @@ class Model(dict):
         cls.key = args[0]
         cls.tableName = args[1]
         cls.aicolumn = args[2]
+        cls.columns = args[3]
         return dict.__new__(cls)
 
     @classmethod
-    def findAll(cls,condition):
-        data = cls.conn.select(cls.tableName,condition = condition)
+    def findAll(cls,condition=''):
+        data = cls.conn.select(cls.tableName,cls.columns,condition)
         result = []
         for each in data:
             result.append(cls(cls.conn,each))
@@ -291,7 +298,7 @@ class Model(dict):
         if keyLen>1:
             for i in range(len(cls.key)-1):
                 conditionStr += " AND `{0}`='{1}'".format(cls.key[i+1],pk[i+1])
-        data = cls.conn.select(cls.tableName,condition = conditionStr)
+        data = cls.conn.select(cls.tableName,cls.columns,conditionStr)
         if len(data)>0:
             return cls(cls.conn,data[0])
         return None
@@ -301,14 +308,21 @@ class Model(dict):
             if len(self.aicolumn)>0:
                 del self[self.aicolumn]
         return self.conn.insert(self.tableName,self)
+
     
     def update(self):
-        conditionStr = "WHERE `{0}`='{1}'".format(self.key[0],self.pop(self.key[0]))
+        popkey = ()
+        for pk in self.key:
+            popkey += (self.pop(pk),)
+        conditionStr = "WHERE `{0}`='{1}'".format(self.key[0],popkey[0])
         keyLen = len(self.key)
         if keyLen>1:
-            for i in range(len(self.key)-1):
-                conditionStr += " AND `{0}`='{1}'".format(self.key[i+1],self.pop(self.key[i+1]))
-        return self.conn.update(self.tableName,self,conditionStr)
+            for i in range(keyLen-1):
+                conditionStr += " AND `{0}`='{1}'".format(self.key[i+1],popkey[i+1])
+        result = self.conn.update(self.tableName,self,conditionStr)
+        for i in range(keyLen):
+            self[self.key[i]] = popkey[i]
+        return result
 
 def main():
     try:
