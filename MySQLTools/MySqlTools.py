@@ -42,7 +42,7 @@ class Connection:
             print(e)
             return False
 
-    def insert(self,tableName='',data={}):
+    def insert(self,tableName='',data={},ai = False):
         """
         插入行
 
@@ -50,31 +50,39 @@ class Connection:
 
         `data` 数据（dict型） `key` 字段名称 `value` 值
 
-        返回 True 或者 False
+        `ai` 是否查询最近自增键值
+
+        返回 (True 或者 False , 自增键值)
         """
         if(len(tableName)<=0):
             return False
         if(self.__connect()):
+            aivalue = -1
+            cmd = ("INSERT INTO `%s` ("%tableName)
+            values = "VALUES ("
+            for clumnName in data.keys():
+                cmd += clumnName+','
+                values +="%({0})s,".format(clumnName)
+            cmd = cmd[0:-1]+") "+values[0:-1]+")"
             try:
-                cmd = ("INSERT INTO `%s` ("%tableName)
-                values = "VALUES ("
-                for clumnName in data.keys():
-                    cmd += clumnName+','
-                    values +="%({0})s,".format(clumnName)
-                cmd = cmd[0:-1]+") "+values[0:-1]+")"
                 self.lock.acquire()
                 cur = self.cnt.cursor()
                 cur.execute(cmd,data)
                 self.cnt.commit()
                 cur.close()
+                if ai:
+                    cur = self.cnt.cursor()
+                    cur.execute('SELECT LAST_INSERT_ID()')
+                    aivalue = cur.fetchone()[0]
+                    cur.close()
                 self.lock.release()
-                return True
+                return True,aivalue
             except Exception as e:
                 print(e)
                 self.lock.release()
-                return False
+                return False,aivalue
         else:
-            return False
+            return False,-1
 
     def delete(self,tableName='',condition=''):
         r"""
@@ -87,8 +95,8 @@ class Connection:
         返回 True 或者 False
         """
         if(self.__connect()):
+            cmd = 'DELETE FROM {0} {1}'.format(tableName,condition)
             try:
-                cmd = 'DELETE FROM {0} {1}'.format(tableName,condition)
                 self.lock.acquire()
                 cur = self.cnt.cursor()
                 cur.execute(cmd)
@@ -116,12 +124,12 @@ class Connection:
         返回 True 或者 False
         """
         if(self.__connect()):
+            values = ""
+            for clumnName in data.keys():
+                values +="`{0}`=%({0})s,".format(clumnName)
+            values =values[0:-1]
+            cmd = 'UPDATE {0} SET {1} {2}'.format(tableName,values,condition)
             try:
-                values = ""
-                for clumnName in data.keys():
-                    values +="`{0}`=%({0})s,".format(clumnName)
-                values =values[0:-1]
-                cmd = 'UPDATE {0} SET {1} {2}'.format(tableName,values,condition)
                 self.lock.acquire()
                 cur = self.cnt.cursor()
                 cur.execute(cmd,data)
@@ -149,16 +157,15 @@ class Connection:
         返回字典列表 每行为一个字典，中间key是字段名称，value是值
         """
         if(self.__connect()):
-            try:
-                
-                col = '*'
-                if(len(columns)>0):
-                    col = ''
-                    for colName in columns:
-                        col += '`%s`,'%colName
-                    col = col[0:-1]
-                else:
-                    cmd = "SELECT `COLUMN_NAME` FROM `information_schema`.`columns` WHERE table_name='{0}' and table_schema='{1}'".format(tableName,self.cnt._database)
+            col = '*'
+            if(len(columns)>0):
+                col = ''
+                for colName in columns:
+                    col += '`%s`,'%colName
+                col = col[0:-1]
+            else:
+                cmd = "SELECT `COLUMN_NAME` FROM `information_schema`.`columns` WHERE table_name='{0}' and table_schema='{1}'".format(tableName,self.cnt._database)
+                try:
                     self.lock.acquire()
                     cur = self.cnt.cursor()
                     cur.execute(cmd)
@@ -166,7 +173,12 @@ class Connection:
                         columns += c
                     cur.close()
                     self.lock.release()
-                cmd = 'SELECT {0} FROM `{1}` {2}'.format(col,tableName,condition)
+                except Exception as e:
+                    print(e)
+                    self.lock.release()
+                    return []
+            cmd = 'SELECT {0} FROM `{1}` {2}'.format(col,tableName,condition)
+            try:
                 self.lock.acquire()
                 cur = self.cnt.cursor()
                 cur.execute(cmd)
@@ -303,12 +315,16 @@ class Model(dict):
             return cls(cls.conn,data[0])
         return None
     
-    def save(self,ai = True):
-        if ai:
-            if len(self.aicolumn)>0:
+    def save(self):
+        ai = False
+        if (len(self.aicolumn)>0):
+            if (self.aicolumn in self):
                 del self[self.aicolumn]
-        return self.conn.insert(self.tableName,self)
-
+            ai = True
+        result,aivalue = self.conn.insert(self.tableName,self,ai)
+        if ai:
+            self[self.aicolumn] = aivalue
+        return result
     
     def update(self):
         popkey = ()
