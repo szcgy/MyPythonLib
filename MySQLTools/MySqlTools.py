@@ -359,12 +359,16 @@ class Model(dict):
         if len(pk)!=keyLen:
             print("pk length dosen't match!!!")
             return None
+        ppk = ()
+        #替换参数中的'\'和'''防止造成SQL语句出错
+        for i in range(keyLen):
+            ppk += ('{0}'.format(pk[i]).replace('\\','\\\\').replace("'","\\'"),)
         #按照主键拼个搜主键的where语句
-        conditionStr += "`{0}`='{1}'".format(cls.key[0],pk[0])
+        conditionStr += "`{0}`='{1}'".format(cls.key[0],ppk[0])
         #主键大于一个的时候后面使用AND连起来
         if keyLen>1:
             for i in range(len(cls.key)-1):
-                conditionStr += " AND `{0}`='{1}'".format(cls.key[i+1],pk[i+1])
+                conditionStr += " AND `{0}`='{1}'".format(cls.key[i+1],ppk[i+1])
         data = cls.conn.select(cls.tableName,cls.columns,conditionStr)
         #找得到就创建实例
         if len(data)>0:
