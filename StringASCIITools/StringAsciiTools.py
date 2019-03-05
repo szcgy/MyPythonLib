@@ -17,5 +17,5 @@ def CRC16(sourceString = ''):
     return '%04X'%crc16.crc16xmodem(sourceString.encode(encoding = 'ascii'))
 
 if __name__ == '__main__':
-    #print(XOR('  '))
-    print(CRC16('  '))
+    #print(XOR('123312'))
+    print(CRC16('123312'))
